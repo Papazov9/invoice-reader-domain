@@ -1,0 +1,18 @@
+# Pinned dependencies for the lean invoice-reading microservice (app.ingest_service).
+# Excludes the full-app stack (Postgres, pgvector, sentence-transformers, torch, chromadb).
+# System packages required but not pip-installable:
+#   tesseract-ocr, tesseract-ocr-bul, poppler-utils  (installed in Dockerfile)
+
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+python-multipart==0.0.12
+pydantic==2.10.4
+pydantic-settings==2.7.0
+pytesseract==0.3.13
+pdf2image==1.17.0
+pillow==11.1.0
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+beautifulsoup4==4.12.3
+defusedxml==0.7.1
+requests==2.32.3

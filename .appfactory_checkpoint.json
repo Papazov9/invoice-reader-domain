@@ -1,0 +1,41 @@
+{
+  "last_completed_agent": "all",
+  "status": "complete",
+  "timestamp": 1790145945.7754488,
+  "report": {
+    "total_input_tokens": 33,
+    "total_output_tokens": 12349,
+    "total_cost_usd": 0.18530000000000002,
+    "agents_completed": [
+      "architect",
+      "backend",
+      "qa"
+    ]
+  },
+  "agent_progress": {
+    "architect": {
+      "status": "done",
+      "files": [
+        "PLAN.md",
+        "app.py",
+        "requirements.txt"
+      ],
+      "session_id": "876c83e9-0ce6-417a-9579-554425846b0b",
+      "error": ""
+    },
+    "backend": {
+      "status": "done",
+      "files": [],
+      "session_id": "42eefe26-a014-4bce-8eab-233bfb71df66",
+      "error": ""
+    },
+    "qa": {
+      "status": "done",
+      "files": [
+        "Dockerfile"
+      ],
+      "session_id": "cb84e5d8-efca-46cd-8069-cc25e41d9988",
+      "error": ""
+    }
+  }
+}
