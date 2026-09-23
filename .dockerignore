@@ -1,0 +1,15 @@
+.venv/
+.octmp/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+tests/
+eval/
+*.md
+.env
+.env.*
+.venv-ingest/
+.venv-*/
+*.log
+.DS_Store

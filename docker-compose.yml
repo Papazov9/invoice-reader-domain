@@ -1,0 +1,52 @@
+# Free invoice reader — Python OCR/vision microservice + local Ollama (qwen2.5vl).
+# No paid API. The vision model is pulled automatically on first start and kept warm.
+#
+# Deploy (the host/bot must provide INGEST_SERVICE_TOKEN in the environment):
+#   INGEST_SERVICE_TOKEN=<long-random-secret> docker compose up -d --build
+#
+# The bot maps the public domain (https://invoice-bot.unparalleled.bg) → the `reader`
+# service on port 8000. Ollama stays private on the internal compose network.
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    # Start the server, wait until it answers, pull the model once (idempotent), then keep running.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        ollama serve &
+        until ollama list >/dev/null 2>&1; do sleep 1; done
+        ollama pull qwen2.5vl:7b
+        wait
+    environment:
+      OLLAMA_KEEP_ALIVE: "-1"          # keep the model in RAM (no 40-60s cold reload)
+    volumes:
+      - ollama_models:/root/.ollama    # persist the ~6GB model across restarts
+    restart: unless-stopped
+    # For an NVIDIA GPU host (much faster), uncomment:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - { driver: nvidia, count: all, capabilities: [gpu] }
+
+  reader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - ollama
+    environment:
+      OCR_VISION_FALLBACK: "true"
+      OCR_VISION_MODEL: "ollama/qwen2.5vl:7b"
+      OCR_VISION_API_BASE: "http://ollama:11434"   # internal compose DNS
+      COMPANY_LOOKUP_ENABLED: "false"              # no external register scrape
+      LLM_TIMEOUT: "180"
+      # REQUIRED. Must equal the INGEST_SERVICE_TOKEN Supabase secret in gumialex.
+      INGEST_SERVICE_TOKEN: "${INGEST_SERVICE_TOKEN:?set INGEST_SERVICE_TOKEN in the environment}"
+    ports:
+      - "8000:8000"                    # the bot routes invoice-bot.unparalleled.bg → here
+    restart: unless-stopped
+
+volumes:
+  ollama_models:

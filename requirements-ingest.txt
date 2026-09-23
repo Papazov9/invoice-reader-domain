@@ -1,0 +1,18 @@
+# Lean dependency set for the invoice-reading microservice (app.ingest_service).
+# Excludes the laws-RAG stack (torch, sentence-transformers, chromadb) and the trained
+# sklearn selectors — the deterministic + vision pipeline runs without them. The free
+# vision path talks to Ollama over stdlib HTTP, so litellm is optional (add it only if you
+# point OCR_VISION_MODEL at a hosted, litellm-routed model instead of Ollama).
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+pydantic>=2.7
+pydantic-settings>=2.3
+pytesseract>=0.3.10
+pdf2image>=1.16.3
+pillow>=10.3
+opencv-python-headless>=4.9
+numpy>=1.26
+beautifulsoup4>=4.12
+defusedxml>=0.7
+requests>=2.31
