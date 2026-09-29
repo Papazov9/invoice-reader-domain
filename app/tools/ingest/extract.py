@@ -12,6 +12,7 @@ the vision model on a poor scan, then recover counterparties from the register.
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 
 from app.domain import Invoice
 
@@ -98,9 +99,38 @@ def _ocr_then_extract(ocr, doc_id: str, source: str, perspective: str, use_visio
     invoice = extract_document(
         ocr.text, doc_id, source, perspective=perspective, low_conf_tokens=ocr.low_conf_tokens
     )
+    # Additive photo/scan path: when the item table didn't come through (reflowed OCR text
+    # has no stable columns), try the column-aligned rendering built from the OCR word boxes.
+    # Adopted only when it reconciles to the tax base, so it can't degrade a good reading and
+    # the vision fallback still handles anything it can't verify.
+    _try_positional_line_items(invoice, getattr(ocr, "layout_text", ""))
     if use_vision and ocr.page_images and should_use_vision(invoice, ocr.mean_conf):
         _apply_vision(invoice, ocr.page_images, doc_id)
     return invoice
+
+
+def _items_sum_matches_net(rows, net) -> bool:
+    """True when the row amounts sum to the tax base (±2%). False when it can't be confirmed."""
+    if not rows or net is None or net == 0:
+        return False
+    s = sum((li.amount for li in rows if li.amount is not None), Decimal(0))
+    return s > 0 and abs(s - net) <= abs(net) * Decimal("0.02")
+
+
+def _try_positional_line_items(invoice: Invoice, layout_text: str) -> None:
+    """Rebuild the item table from the column-aligned OCR layout and ADOPT it only when its
+    rows reconcile to the tax base (±2%). A non-reconciling rebuild is discarded, so this
+    turns an empty/wrong item list into a verified one and never overrides a good table."""
+    net = invoice.net_amount
+    if not layout_text or net is None or net == 0:
+        return
+    if _items_sum_matches_net(invoice.line_items, net):
+        return  # already have a table that reconciles — leave it
+    from .line_items import parse_line_items
+
+    rows = parse_line_items(layout_text)
+    if _items_sum_matches_net(rows, net):
+        invoice.line_items = rows
 
 
 def _apply_vision(invoice: Invoice, page_images: list[bytes], doc_id: str) -> None:

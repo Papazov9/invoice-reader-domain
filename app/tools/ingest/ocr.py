@@ -55,6 +55,10 @@ class OcrResult:
     low_conf_tokens: set[str] = field(default_factory=set)
     mean_conf: float = 1.0  # 0..1; 1.0 when no confidence data is available
     page_images: list[bytes] = field(default_factory=list)  # PNG bytes per page
+    # A column-aligned rendering of the page built from each word's x-pixel position, so the
+    # deterministic line-item slicer (written for pdftotext -layout) can also read the item
+    # table off a PHOTO. Empty for embedded-text PDFs (their own text is already columnar).
+    layout_text: str = ""
 
 
 def ocr_status() -> dict[str, object]:
@@ -207,6 +211,54 @@ def _image_to_text(data: dict, width: int) -> str:
     return "\n".join(out)
 
 
+def _line_words(data: dict) -> list[list[tuple[int, int, str]]]:
+    """Group recognised words into lines, each a list of (left_x, width, word) in reading
+    order — like ``_lines_from_data`` but keeping the left edge and width so a column-aligned
+    text can be reconstructed from the pixel positions."""
+    lines: dict[tuple, list[tuple[int, int, str]]] = {}
+    order: list[tuple] = []
+    n = len(data.get("text", []))
+    for i in range(n):
+        word = data["text"][i]
+        if not word or not word.strip():
+            continue
+        key = (data["block_num"][i], data["par_num"][i], data["line_num"][i])
+        if key not in lines:
+            lines[key] = []
+            order.append(key)
+        lines[key].append((int(data["left"][i]), int(data["width"][i]), word))
+    return [sorted(lines[k], key=lambda w: w[0]) for k in order]
+
+
+def _char_px(line_words: list[list[tuple[int, int, str]]]) -> float:
+    """Median pixel width of one character across the page, used to map an x-pixel offset to
+    a monospace character column. Median is robust to the odd very-wide/short OCR token."""
+    widths = sorted(w / len(t) for ln in line_words for (_l, w, t) in ln if t and w > 0)
+    return widths[len(widths) // 2] if widths else 0.0
+
+
+def _image_to_layout(data: dict) -> str:
+    """Render the OCR words into fixed-width, column-preserving text using each word's
+    x-pixel position (approximating ``pdftotext -layout``). This lets the deterministic
+    line-item slicer read the item table off a photo. It is only as good as the OCR boxes,
+    but any misparse is discarded downstream (the rows must reconcile to the tax base), so
+    it can only ever ADD a free reading — it never overrides a good one."""
+    line_words = _line_words(data)
+    cpx = _char_px(line_words)
+    if cpx <= 0:
+        return ""
+    out: list[str] = []
+    for ln in line_words:
+        buf = ""
+        for left, _w, word in ln:
+            col = int(round(left / cpx))
+            if col < len(buf):
+                col = len(buf) + 1  # never clobber a placed word; keep at least one gap
+            buf += " " * (col - len(buf)) + word
+        out.append(buf)
+    return "\n".join(out)
+
+
 def _collect_confidence(data: dict, low: set[str], confs: list[float], threshold: float) -> None:
     n = len(data.get("text", []))
     for i in range(n):
@@ -232,6 +284,7 @@ def _images_to_result(images, photo: bool = False) -> OcrResult:
     lang = settings.ocr_languages
     threshold = settings.ocr_word_conf_min
     parts: list[str] = []
+    layout_parts: list[str] = []
     low: set[str] = set()
     confs: list[float] = []
     pages: list[bytes] = []
@@ -239,6 +292,7 @@ def _images_to_result(images, photo: bool = False) -> OcrResult:
         prepared = _preprocess(image, photo=photo)
         data = _ocr_data(prepared, lang)
         parts.append(_image_to_text(data, prepared.width))
+        layout_parts.append(_image_to_layout(data))
         _collect_confidence(data, low, confs, threshold)
         # Vision fallback gets the ORIGINAL page, not the binarized one: Tesseract wants a
         # thresholded image, but a vision model reads the natural colour/greyscale page more
@@ -250,6 +304,7 @@ def _images_to_result(images, photo: bool = False) -> OcrResult:
         low_conf_tokens=low,
         mean_conf=mean_conf,
         page_images=pages,
+        layout_text="\n\n".join(layout_parts),
     )
 
 

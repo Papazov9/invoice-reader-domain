@@ -19,12 +19,17 @@ services:
       dockerfile: Dockerfile
     environment:
       OCR_VISION_FALLBACK: "true"
-      # Vision fallback → Claude Haiku 4.5 via litellm. Runs only for hard photos the
-      # deterministic pass can't reconcile; digital PDFs never reach it.
+      # Both Claude-backed paths use Haiku 4.5 via litellm, and BOTH stay enabled (each is a
+      # non-destructive gap-filler — it only fills fields the deterministic pass left weak,
+      # never overrides a confident read):
+      #   - llm_assist (text): fills weak NON-AMOUNT fields (parties/number/date).
+      #   - vision (image):    reads item rows + fields the rules missed on hard photos.
+      # Both fire only on the gates in the code (weak/incomplete reads); a clean digital PDF
+      # triggers neither, so it costs nothing.
+      LLM_MODEL: "anthropic/claude-haiku-4-5-20251001"
       OCR_VISION_MODEL: "anthropic/claude-haiku-4-5-20251001"
-      # No OCR_VISION_API_BASE: an empty base makes litellm use LLM_API_KEY against the
-      # Anthropic API. Setting a base here would suppress the api-key header.
-      LLM_ASSIST_ENABLED: "false"                  # the vision call already reads every field
+      # No OCR_VISION_API_BASE / LLM_API_BASE: an empty base makes litellm use LLM_API_KEY
+      # against the Anthropic API. Setting a base here would suppress the api-key header.
       COMPANY_LOOKUP_ENABLED: "false"              # no external register scrape
       LLM_TIMEOUT: "60"                            # Claude answers in seconds
       # REQUIRED. Anthropic key for the Claude Haiku 4.5 safety net.
