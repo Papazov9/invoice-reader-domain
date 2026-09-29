@@ -6,7 +6,8 @@ so it starts fast and needs no Postgres, no sqlalchemy and none of the ~4GB laws
 that `app.main` pulls in through `app.api.schemas`.
 
 Run locally:   uvicorn app.ingest_service:app --host 0.0.0.0 --port 8000
-Vision model:  set OCR_VISION_MODEL=ollama/qwen2.5vl:7b and OCR_VISION_API_BASE=http://<ollama>:11434
+Vision model:  set OCR_VISION_MODEL=anthropic/claude-haiku-4-5-20251001 and LLM_API_KEY=<key>;
+               the fallback runs only on hard photos the deterministic pass can't reconcile.
 Auth:          set INGEST_SERVICE_TOKEN and send it as the `x-ingest-token` header.
 """
 

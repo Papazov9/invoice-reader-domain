@@ -1,8 +1,10 @@
 # Lean dependency set for the invoice-reading microservice (app.ingest_service).
 # Excludes the laws-RAG stack (torch, sentence-transformers, chromadb) and the trained
-# sklearn selectors — the deterministic + vision pipeline runs without them. The free
-# vision path talks to Ollama over stdlib HTTP, so litellm is optional (add it only if you
-# point OCR_VISION_MODEL at a hosted, litellm-routed model instead of Ollama).
+# sklearn selectors — the deterministic pipeline runs without them.
+#
+# The reader is deterministic-first (pdftotext + Tesseract). The vision fallback fires only
+# when a read comes out incomplete/unreconciled (typically a phone photo) and is routed to
+# Claude Haiku 4.5 via litellm — so litellm is required for that safety net.
 fastapi>=0.115
 uvicorn[standard]>=0.30
 python-multipart>=0.0.9
@@ -16,3 +18,6 @@ numpy>=1.26
 beautifulsoup4>=4.12
 defusedxml>=0.7
 requests>=2.31
+# Routes the vision fallback to Claude Haiku 4.5 (Anthropic). Reads only the hard photos
+# the deterministic pass can't reconcile; digital PDFs never reach it.
+litellm>=1.50
