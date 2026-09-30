@@ -16,3 +16,7 @@ numpy==1.26.4
 beautifulsoup4==4.12.3
 defusedxml==0.7.1
 requests==2.32.3
+# Routes the vision fallback to Claude Haiku 4.5 (Anthropic). Reads only the hard photos the
+# deterministic pass can't reconcile; digital PDFs never reach it. REQUIRED — without it the
+# fallback import fails and photos silently come back incomplete.
+litellm>=1.50
