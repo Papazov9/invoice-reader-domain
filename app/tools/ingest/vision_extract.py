@@ -467,8 +467,13 @@ def _litellm_vision_complete(model: str, images: list[bytes]) -> str:
     api_base = s.ocr_vision_api_base or s.llm_api_base
     if api_base:
         kwargs["api_base"] = api_base
-    if s.llm_api_key and not s.ocr_vision_api_base:  # a self-hosted vision base needs no key
-        kwargs["api_key"] = s.llm_api_key
+    # A per-request key forwarded by the proxy (x-llm-api-key) wins over the env key, so the
+    # reader host need not store an Anthropic key of its own.
+    from .request_context import get_request_api_key
+
+    api_key = get_request_api_key() or s.llm_api_key
+    if api_key and not s.ocr_vision_api_base:  # a self-hosted vision base needs no key
+        kwargs["api_key"] = api_key
     resp = litellm.completion(**kwargs)
     msg = resp["choices"][0]["message"]
     return msg.get("content") if isinstance(msg, dict) else getattr(msg, "content", "")

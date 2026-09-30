@@ -5,9 +5,14 @@
 # phone photo) and is routed to Claude Haiku 4.5 — a few cents per hard photo, and nothing
 # for a clean digital PDF. No local model, so no GPU/large-RAM requirement and no swap.
 #
-# Deploy (the host/bot must provide INGEST_SERVICE_TOKEN and ANTHROPIC_API_KEY):
+# Deploy (the host/bot must provide INGEST_SERVICE_TOKEN):
 #   docker compose up -d --build
-# with both values present in the environment / project .env (NEVER committed).
+# with that value present in the environment / project .env (NEVER committed).
+#
+# The Anthropic key is NOT stored here: the gumialex edge function holds each tenant's own
+# key (in Supabase) and forwards it per request as the `x-llm-api-key` header, so the reader
+# host keeps no key and each tenant's vision usage bills to that tenant. ANTHROPIC_API_KEY is
+# an OPTIONAL env fallback for standalone use — leave it unset in the multi-tenant setup.
 #
 # The bot maps the public domain (https://invoice-bot.unparalleled.bg) → the `reader`
 # service on port 8000.
@@ -28,12 +33,13 @@ services:
       # triggers neither, so it costs nothing.
       LLM_MODEL: "anthropic/claude-haiku-4-5-20251001"
       OCR_VISION_MODEL: "anthropic/claude-haiku-4-5-20251001"
-      # No OCR_VISION_API_BASE / LLM_API_BASE: an empty base makes litellm use LLM_API_KEY
-      # against the Anthropic API. Setting a base here would suppress the api-key header.
+      # No OCR_VISION_API_BASE / LLM_API_BASE: an empty base makes litellm use the request's
+      # x-llm-api-key (or LLM_API_KEY) against the Anthropic API. A base would suppress it.
       COMPANY_LOOKUP_ENABLED: "false"              # no external register scrape
       LLM_TIMEOUT: "60"                            # Claude answers in seconds
-      # REQUIRED. Anthropic key for the Claude Haiku 4.5 safety net.
-      LLM_API_KEY: "${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY in the environment}"
+      # OPTIONAL fallback only. Normally unset — the edge function forwards the key per request
+      # (x-llm-api-key). Set it only for standalone use without the gumialex proxy.
+      LLM_API_KEY: "${ANTHROPIC_API_KEY:-}"
       # REQUIRED. Must equal the INGEST_SERVICE_TOKEN Supabase secret in gumialex.
       INGEST_SERVICE_TOKEN: "${INGEST_SERVICE_TOKEN:?set INGEST_SERVICE_TOKEN in the environment}"
     ports:

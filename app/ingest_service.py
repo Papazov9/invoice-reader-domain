@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import __version__
 from app.domain import Invoice
 from app.tools.ingest import extract_from_image_bytes, extract_from_pdf_bytes, ocr_status
+from app.tools.ingest.request_context import reset_request_api_key, set_request_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -59,16 +60,21 @@ async def extract_pdf(
     file: UploadFile = File(...),
     perspective: str = Form("auto"),
     vision: bool = Form(True),
+    x_llm_api_key: str | None = Header(default=None),
 ) -> dict[str, Invoice]:
     """OCR/read a PDF invoice and return the structured Invoice. `vision=false` skips the
-    (slow) vision fallback for bulk use."""
+    (slow) vision fallback for bulk use. `x-llm-api-key`, when sent, is the key used for this
+    request's Claude fallback (so the reader host stores no key of its own)."""
     _ensure_ocr()
     content = await file.read()
     doc_id = (file.filename or "invoice").rsplit(".", 1)[0]
+    tok = set_request_api_key(x_llm_api_key)
     try:
         invoice = extract_from_pdf_bytes(content, doc_id, source="ocr", perspective=perspective, use_vision=vision)
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"OCR failed: {exc}") from exc
+    finally:
+        reset_request_api_key(tok)
     return {"invoice": invoice}
 
 
@@ -77,15 +83,20 @@ async def extract_image(
     file: UploadFile = File(...),
     perspective: str = Form("auto"),
     vision: bool = Form(True),
+    x_llm_api_key: str | None = Header(default=None),
 ) -> dict[str, Invoice]:
-    """OCR/read a photographed or scanned image invoice and return the structured Invoice."""
+    """OCR/read a photographed or scanned image invoice and return the structured Invoice.
+    `x-llm-api-key`, when sent, is the key used for this request's Claude fallback."""
     _ensure_ocr()
     content = await file.read()
     doc_id = (file.filename or "image").rsplit(".", 1)[0]
+    tok = set_request_api_key(x_llm_api_key)
     try:
         invoice = extract_from_image_bytes(content, doc_id, source="ocr", perspective=perspective, use_vision=vision)
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"image OCR failed: {exc}") from exc
+    finally:
+        reset_request_api_key(tok)
     return {"invoice": invoice}
 
 

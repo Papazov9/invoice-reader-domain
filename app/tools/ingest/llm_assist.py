@@ -42,7 +42,10 @@ def _resolve_model() -> tuple[str, str, str]:
     heavy rag package: a hosted model wins, else the local/containerized fallback."""
     s = get_settings()
     if s.llm_model:
-        return s.llm_model, s.llm_api_base, s.llm_api_key
+        # A per-request key forwarded by the proxy (x-llm-api-key) wins over the env key.
+        from .request_context import get_request_api_key
+
+        return s.llm_model, s.llm_api_base, (get_request_api_key() or s.llm_api_key)
     if s.llm_fallback_enabled and s.llm_fallback_model:
         return s.llm_fallback_model, s.llm_fallback_api_base, ""
     return "", "", ""
