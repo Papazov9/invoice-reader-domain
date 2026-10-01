@@ -60,6 +60,10 @@ _STRING_FIELDS = (
 )
 _AMOUNT_FIELDS = ("net_amount", "vat_amount", "total_amount")
 _ITEMS_KEY = "__items__"  # reserved fields key carrying the JSON-encoded item rows
+# Bulgaria's irrevocably fixed euro-adoption rate. Dual-currency (BGN+EUR) invoices print every
+# amount twice; when net/VAT are read from one currency column and the total from the other, the
+# total comes out as net+vat multiplied (or divided) by exactly this rate.
+_BGN_PER_EUR = Decimal("1.95583")
 
 
 def _to_decimal(raw: object) -> Decimal | None:
@@ -114,23 +118,31 @@ def _reconcile_totals(invoice: Invoice) -> None:
         if abs(summed - t) <= abs(summed) * Decimal("0.01"):
             invoice.total_amount = summed  # cents-level OCR rounding; safe to normalise
             return
-        # A MATERIAL gap between net+vat and the printed total. DIRECTION decides safety: a
-        # total BELOW net+vat is impossible on a real invoice, so it's a misread/truncation
-        # (e.g. 464.02 read as 64) — prefer the sum. A total ABOVE net+vat is legitimate — a
-        # genuine total can carry non-taxable components (deposits, telecom carry-over balances,
-        # levies), so overwriting it with net+vat is a real regression (BG131391369: true
-        # 6331.20 must not become 5658.28 just because VAT is 20% of the base). Only correct the
-        # short case, and only when net+vat is structurally trustworthy (VAT a standard 0/9/20%
-        # fraction of net, or the item amounts sum to net). Compare magnitudes so credit notes
+        # A MATERIAL gap between net+vat and the printed total. Trust net+vat to override the
+        # printed total only when net+vat is structurally sound (VAT a standard 0/9/20% fraction
+        # of net, or the item amounts sum to net). Compare magnitudes so credit notes
         # (net/vat/total all negative) reconcile the same way.
-        if abs(t) >= abs(summed):
-            return
         rate_ok = n != 0 and any(
             abs(v / n - r) < Decimal("0.015") for r in (Decimal("0"), Decimal("0.09"), Decimal("0.20"))
         )
         items_sum = sum((li.amount for li in invoice.line_items if li.amount is not None), Decimal(0))
         items_ok = items_sum > 0 and abs(items_sum - n) <= abs(n) * Decimal("0.01")
-        if rate_ok or items_ok:
+        trustworthy = rate_ok or items_ok
+        # DIRECTION decides safety. A total BELOW net+vat is impossible on a real invoice, so it's
+        # a misread/truncation (e.g. 464.02 read as 64) — prefer the sum.
+        if abs(t) < abs(summed):
+            if trustworthy:
+                invoice.total_amount = summed
+            return
+        # A total ABOVE net+vat is normally LEGITIMATE — it can carry non-taxable components
+        # (deposits, telecom carry-over balances, levies), so overwriting it with net+vat would be
+        # a real regression (BG131391369: true 6331.20 must not become 5658.28 just because VAT is
+        # 20% of the base). The one exception is the dual-currency (BGN+EUR euro-transition)
+        # invoice: net/VAT get read from one currency column and the total from the other, so the
+        # "high" total is exactly net+vat converted at the fixed 1.95583 BGN/EUR rate. Detect that
+        # precise ratio and restore the total in the invoice's own currency; leave every other
+        # high total untouched.
+        if trustworthy and summed != 0 and abs(abs(t) / abs(summed) - _BGN_PER_EUR) <= Decimal("0.02"):
             invoice.total_amount = summed
 
 
