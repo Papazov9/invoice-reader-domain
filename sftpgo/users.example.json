@@ -1,5 +1,5 @@
 {
-  "_comment": "TEMPLATE. Copy to sftpgo/users.json (gitignored), fill the password and the Primex IP, then (re)deploy. SFTPGo loads this on every start (SFTPGO_LOADDATA_FROM) and updates the user in place, so changing the IP or password here and restarting is enough.",
+  "_comment": "TEMPLATE. Copy to sftpgo/users.json (gitignored). Set a real password now; LEAVE allowed_ip as 192.0.2.1/32 until Primex sends their IP. 192.0.2.1 is a reserved 'nowhere' test address (RFC 5737) — the config is valid and the stack runs, but nobody can log in (fail-closed) until you swap in the real IP. SFTPGo reloads this file on every restart, so when the IP arrives you edit this one line + restart.",
 
   "users": [
     {
@@ -17,7 +17,7 @@
         "/": ["list", "upload"]
       },
       "filters": {
-        "allowed_ip": ["REPLACE_WITH_PRIMEX_IP/32"],
+        "allowed_ip": ["192.0.2.1/32"],
         "denied_protocols": ["SSH", "HTTP", "DAV"],
         "max_upload_file_size": 0
       },
