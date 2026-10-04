@@ -1,0 +1,60 @@
+{
+  "_comment": "SFTPGo config for the Primex product-feed FTP front door. Mounted read-only at /etc/sftpgo/sftpgo.json. Anything not set here uses SFTPGo defaults. Secrets (the Primex password, the allowed IP) live in users.json, NOT here. The public IP is injected via the SFTPGO_FTPD__BINDINGS__0__FORCE_PASSIVE_IP env var in docker-compose.",
+
+  "common": {
+    "defender": {
+      "enabled": true,
+      "ban_time": 30,
+      "ban_time_increment": 50,
+      "threshold": 10,
+      "score_invalid": 2,
+      "score_valid": 1,
+      "observation_time": 30,
+      "entries_soft_limit": 100,
+      "entries_hard_limit": 150
+    }
+  },
+
+  "data_provider": {
+    "driver": "sqlite",
+    "name": "sftpgo.db"
+  },
+
+  "sftpd": {
+    "bindings": [
+      { "port": 0 }
+    ]
+  },
+
+  "ftpd": {
+    "bindings": [
+      {
+        "port": 2121,
+        "address": "",
+        "tls_mode": 0,
+        "force_passive_ip": "",
+        "passive_connections_security": 0,
+        "active_connections_security": 1,
+        "debug": false
+      }
+    ],
+    "passive_port_range": {
+      "start": 50000,
+      "end": 50100
+    },
+    "banner": "Primex feed drop. Authorized uploads only.",
+    "certificate_file": "",
+    "certificate_key_file": ""
+  },
+
+  "httpd": {
+    "bindings": [
+      {
+        "port": 8080,
+        "address": "127.0.0.1",
+        "enable_web_admin": true,
+        "enable_web_client": false
+      }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "_comment": "TEMPLATE. Copy to sftpgo/users.json (gitignored), fill the password and the Primex IP, then (re)deploy. SFTPGo loads this on every start (SFTPGO_LOADDATA_FROM) and updates the user in place, so changing the IP or password here and restarting is enough.",
+
+  "users": [
+    {
+      "username": "primex",
+      "status": 1,
+      "expiration_date": 0,
+      "password": "REPLACE_WITH_A_STRONG_PASSWORD",
+      "home_dir": "/srv/sftpgo/data/primex",
+      "uid": 0,
+      "gid": 0,
+      "max_sessions": 3,
+      "quota_size": 0,
+      "quota_files": 0,
+      "permissions": {
+        "/": ["list", "upload"]
+      },
+      "filters": {
+        "allowed_ip": ["REPLACE_WITH_PRIMEX_IP/32"],
+        "denied_protocols": ["SSH", "HTTP", "DAV"],
+        "max_upload_file_size": 0
+      },
+      "description": "Primex product feed uploader. Upload + list only (no download, no delete, no rename, no overwrite). Chrooted to its own home. Locked to Primex's source IP."
+    }
+  ]
+}

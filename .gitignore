@@ -6,3 +6,7 @@ __pycache__/
 .env
 .env.*
 !.env.example
+
+# SFTPGo real user file (contains the Primex password + allowed IP)
+sftpgo/users.json
+sftpgo/*.db

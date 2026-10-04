@@ -45,3 +45,50 @@ services:
     ports:
       - "8000:8000"                    # the bot routes invoice-bot.unparalleled.bg → here
     restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Primex product-feed FTP front door (SFTPGo) + bridge to Supabase.
+  # Separate concern from the reader; shares only the box. Primex uploads a CSV
+  # over plain FTP into the `primex` user's chrooted home; feed-bridge ferries
+  # it to the `feed-quarantine` bucket and triggers primex-feed-import.
+  # ---------------------------------------------------------------------------
+  sftpgo:
+    image: drakkan/sftpgo:v2.6-alpine
+    restart: unless-stopped
+    ports:
+      - "21:2121"                      # FTP control (host 21 -> container 2121, non-root)
+      - "50000-50100:50000-50100"      # FTP passive data range (must match sftpgo.json)
+      - "127.0.0.1:8080:8080"          # admin UI, localhost only (reach via SSH tunnel)
+    environment:
+      # Public IP SFTPGo advertises for passive connections. Not a secret, but
+      # kept in .env so this file has no host-specific values.
+      SFTPGO_FTPD__BINDINGS__0__FORCE_PASSIVE_IP: "${VPS_PUBLIC_IP:?set VPS_PUBLIC_IP in .env}"
+      SFTPGO_LOADDATA_FROM: /var/lib/sftpgo/init/users.json
+      SFTPGO_LOADDATA_MODE: "0"        # load/update users on every start
+    volumes:
+      - ./sftpgo/sftpgo.json:/etc/sftpgo/sftpgo.json:ro
+      - ./sftpgo/users.json:/var/lib/sftpgo/init/users.json:ro
+      - sftpgo_data:/srv/sftpgo/data
+      - sftpgo_db:/var/lib/sftpgo
+
+  feed-bridge:
+    build:
+      context: ./sftpgo/bridge
+    restart: unless-stopped
+    environment:
+      SUPABASE_URL: "${SUPABASE_URL:?set SUPABASE_URL in .env}"
+      SUPABASE_SERVICE_ROLE_KEY: "${SUPABASE_SERVICE_ROLE_KEY:?set SUPABASE_SERVICE_ROLE_KEY in .env}"
+      PRIMEX_IMPORT_SECRET: "${PRIMEX_IMPORT_SECRET:?set PRIMEX_IMPORT_SECRET in .env}"
+      WATCH_DIR: "/data/primex"
+      BUCKET: "feed-quarantine"
+      IMPORT_FUNCTION: "primex-feed-import"
+      POLL_SECONDS: "30"
+      STABLE_SECONDS: "20"
+    volumes:
+      - sftpgo_data:/data           # same volume SFTPGo writes uploads into
+    depends_on:
+      - sftpgo
+
+volumes:
+  sftpgo_data:
+  sftpgo_db:
