@@ -29,12 +29,15 @@ See `../.env.example`. The new keys:
 - `PRIMEX_IMPORT_SECRET` — must equal the `PRIMEX_IMPORT_SECRET` secret in that Supabase project.
 
 ## Deploy
+This runs as a **separate compose project** (`primex-ftp`) from the invoice reader
+(`appfactory-invoice-bot`, which owns port 8000). Always use `-f docker-compose.ftp.yml`
+so you never collide with the reader.
 ```bash
 cp sftpgo/users.example.json sftpgo/users.json
-# edit sftpgo/users.json: set password + "<PRIMEX_IP>/32"
+# edit sftpgo/users.json: set password (leave IP as 192.0.2.1/32 until Primex sends theirs)
 # edit .env: set VPS_PUBLIC_IP, SUPABASE_*, PRIMEX_IMPORT_SECRET
-docker compose up -d --build
-docker compose logs -f sftpgo feed-bridge
+docker compose -f docker-compose.ftp.yml up -d --build
+docker compose -f docker-compose.ftp.yml logs -f sftpgo feed-bridge
 ```
 
 ## Firewall — mandatory (plain FTP = cleartext password)

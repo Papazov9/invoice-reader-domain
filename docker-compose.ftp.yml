@@ -1,0 +1,57 @@
+# Primex product-feed FTP front door — a SEPARATE compose project from the reader.
+#
+# The invoice reader runs under its own project (appfactory-invoice-bot) and owns
+# port 8000. This file deliberately does NOT include the reader, and pins its own
+# project name (primex-ftp), so bringing the FTP stack up or down never touches or
+# conflicts with the reader. No port overlap: FTP uses 21 + 50000-50100 + 127.0.0.1:8080.
+#
+# Uses the same .env in this folder (VPS_PUBLIC_IP, SUPABASE_*, PRIMEX_IMPORT_SECRET).
+#
+#   Bring up:  docker compose -f docker-compose.ftp.yml up -d --build
+#   Status:    docker compose -f docker-compose.ftp.yml ps
+#   Logs:      docker compose -f docker-compose.ftp.yml logs -f sftpgo feed-bridge
+#   Down:      docker compose -f docker-compose.ftp.yml down
+
+name: primex-ftp
+
+services:
+  sftpgo:
+    image: drakkan/sftpgo:v2.6-alpine
+    restart: unless-stopped
+    ports:
+      - "21:2121"                      # FTP control (host 21 -> container 2121, non-root)
+      - "50000-50100:50000-50100"      # FTP passive data range (must match sftpgo.json)
+      - "127.0.0.1:8080:8080"          # admin UI, localhost only (reach via SSH tunnel)
+    environment:
+      # Public IP SFTPGo advertises for passive connections. Not a secret, but
+      # kept in .env so this file has no host-specific values.
+      SFTPGO_FTPD__BINDINGS__0__FORCE_PASSIVE_IP: "${VPS_PUBLIC_IP:?set VPS_PUBLIC_IP in .env}"
+      SFTPGO_LOADDATA_FROM: /var/lib/sftpgo/init/users.json
+      SFTPGO_LOADDATA_MODE: "0"        # load/update users on every start
+    volumes:
+      - ./sftpgo/sftpgo.json:/etc/sftpgo/sftpgo.json:ro
+      - ./sftpgo/users.json:/var/lib/sftpgo/init/users.json:ro
+      - sftpgo_data:/srv/sftpgo/data
+      - sftpgo_db:/var/lib/sftpgo
+
+  feed-bridge:
+    build:
+      context: ./sftpgo/bridge
+    restart: unless-stopped
+    environment:
+      SUPABASE_URL: "${SUPABASE_URL:?set SUPABASE_URL in .env}"
+      SUPABASE_SERVICE_ROLE_KEY: "${SUPABASE_SERVICE_ROLE_KEY:?set SUPABASE_SERVICE_ROLE_KEY in .env}"
+      PRIMEX_IMPORT_SECRET: "${PRIMEX_IMPORT_SECRET:?set PRIMEX_IMPORT_SECRET in .env}"
+      WATCH_DIR: "/data/primex"
+      BUCKET: "feed-quarantine"
+      IMPORT_FUNCTION: "primex-feed-import"
+      POLL_SECONDS: "30"
+      STABLE_SECONDS: "20"
+    volumes:
+      - sftpgo_data:/data           # same volume SFTPGo writes uploads into
+    depends_on:
+      - sftpgo
+
+volumes:
+  sftpgo_data:
+  sftpgo_db:
