@@ -21,7 +21,7 @@ services:
     ports:
       - "21:2121"                      # FTP control (host 21 -> container 2121, non-root)
       - "50000-50100:50000-50100"      # FTP passive data range (must match sftpgo.json)
-      - "127.0.0.1:8080:8080"          # admin UI, localhost only (reach via SSH tunnel)
+      - "127.0.0.1:8092:8080"          # admin UI, localhost only (8092 host -> 8080 in container; reach via SSH tunnel)
     environment:
       # Public IP SFTPGo advertises for passive connections. Not a secret, but
       # kept in .env so this file has no host-specific values.

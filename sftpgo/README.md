@@ -47,8 +47,8 @@ enforces `allowed_ip`). Example with ufw:
 PRIMEX_IP=1.2.3.4
 sudo ufw allow from $PRIMEX_IP to any port 21 proto tcp
 sudo ufw allow from $PRIMEX_IP to any port 50000:50100 proto tcp
-# 8080 (admin) stays closed to the world — it's bound to 127.0.0.1; use an SSH tunnel:
-#   ssh -L 8080:127.0.0.1:8080 user@vps   then open http://localhost:8080
+# admin UI stays closed to the world — bound to 127.0.0.1:8092; use an SSH tunnel:
+#   ssh -L 8092:127.0.0.1:8092 user@vps   then open http://localhost:8092
 ```
 
 ## DNS / Cloudflare caveat
